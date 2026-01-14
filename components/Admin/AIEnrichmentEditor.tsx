@@ -2,11 +2,17 @@
 import React, { useState } from 'react';
 import { useSalesStore } from '../../store.ts';
 import { AIPrompt } from '../../types.ts';
+import { GoogleGenAI } from "@google/genai";
 
 const AIEnrichmentEditor: React.FC = () => {
   const { aiPrompts, saveAIPrompt } = useSalesStore();
   const [selectedProvider, setSelectedProvider] = useState<AIPrompt['provider']>('gemini');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Playground State
+  const [testInput, setTestInput] = useState('');
+  const [testOutput, setTestOutput] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const currentPrompt = aiPrompts.find(p => p.provider === selectedProvider) || {
     provider: selectedProvider,
@@ -33,9 +39,34 @@ const AIEnrichmentEditor: React.FC = () => {
     saveAIPrompt({ ...currentPrompt, promptText: text });
   };
 
+  const handleTestRun = async () => {
+    if (!testInput) return;
+    setIsGenerating(true);
+    setTestOutput('');
+
+    try {
+        // Use Gemini for simulation regardless of selected provider to save tokens/complexity in this demo
+        // In real app, switch based on selectedProvider
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const systemInstruction = currentPrompt.promptText;
+        const fullPrompt = `${systemInstruction}\n\nUSER INPUT FOR TESTING: ${testInput}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: fullPrompt
+        });
+        
+        setTestOutput(response.text || 'Brak odpowiedzi.');
+    } catch (e: any) {
+        setTestOutput(`Error: ${e.message}`);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   return (
-    <div className="space-y-12 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-8 animate-in fade-in duration-500 h-full flex flex-col">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
         <div>
           <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">8.6 Edytor Promptów Wzbogacania (Enrichment)</h3>
           <p className="text-slate-500 text-sm font-medium mt-1">Definiuj instrukcje systemowe dla agentów AI wspierających Research.</p>
@@ -55,9 +86,9 @@ const AIEnrichmentEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 min-h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-8 flex-1">
         {/* Providers Sidebar */}
-        <div className="w-full lg:w-64 space-y-2">
+        <div className="w-full lg:w-64 space-y-2 shrink-0">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Wybierz Dostawcę</label>
           {providers.map(p => (
             <button
@@ -78,63 +109,75 @@ const AIEnrichmentEditor: React.FC = () => {
           ))}
         </div>
 
-        {/* Editor Area */}
-        <div className="flex-1 space-y-6">
-           <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="bg-slate-900 px-8 py-5 flex justify-between items-center text-white">
+        {/* Main Column */}
+        <div className="flex-1 flex flex-col gap-6 h-full">
+           
+           {/* TOP: Prompt Editor (Smaller) */}
+           <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] overflow-hidden flex flex-col shadow-sm h-[400px]">
+              <div className="bg-slate-900 px-8 py-4 flex justify-between items-center text-white shrink-0">
                  <div className="flex items-center space-x-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Content Editor</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-50">System Prompt</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedProvider} - SYSTEM PROMPT</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedProvider}</span>
                  </div>
-                 <div className="text-[10px] font-black opacity-40 uppercase">v{currentPrompt.version} • Ostatnia aktualizacja: {new Date(currentPrompt.lastUpdated || Date.now()).toLocaleDateString()}</div>
+                 <div className="text-[10px] font-black opacity-40 uppercase">v{currentPrompt.version}</div>
               </div>
               
-              <div className="flex-1 flex flex-col relative">
+              <div className="flex-1 relative">
                 <textarea
                   value={currentPrompt.promptText}
                   onChange={(e) => updateText(e.target.value)}
-                  className="w-full h-full p-10 font-mono text-xs text-slate-700 leading-relaxed outline-none bg-slate-50/30 min-h-[500px]"
+                  className="w-full h-full p-8 font-mono text-xs text-slate-700 leading-relaxed outline-none bg-slate-50/30 resize-none"
                   placeholder="Wpisz tutaj treść promptu systemowego..."
                 />
-                
-                <div className="absolute bottom-6 right-6 flex items-center space-x-2">
-                   <button className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-600 shadow-sm transition-all">
-                      PODGLĄD ZMIENNYCH
-                   </button>
-                </div>
               </div>
            </div>
 
-           {/* Variable Documentation */}
-           <div className="bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100/50 grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                 <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest mb-3">Zmienne Systemowe</p>
-                 <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                       <code className="bg-white px-2 py-1 rounded text-[10px] font-black text-blue-600">{"{COMPANY}"}</code>
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Nazwa Klienta</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                       <code className="bg-white px-2 py-1 rounded text-[10px] font-black text-blue-600">{"{MISSING}"}</code>
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Lista brakujących pól</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                       <code className="bg-white px-2 py-1 rounded text-[10px] font-black text-blue-600">{"{CONTEXT}"}</code>
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Pełny JSON (SOW/ROI)</span>
-                    </div>
-                 </div>
+           {/* BOTTOM: Test Playground */}
+           <div className="flex-1 bg-slate-50 rounded-[2.5rem] border border-slate-200 p-8 flex flex-col gap-6 relative">
+              <div className="absolute top-0 right-0 bg-white border-l border-b border-slate-200 px-6 py-2 rounded-bl-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                 Symulator / Playground
               </div>
-              <div className="md:col-span-2">
-                 <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest mb-3">Rekomendowany Format Outputu</p>
-                 <p className="text-[10px] text-slate-500 font-medium leading-relaxed mb-4">
-                    Research wymaga ustrukturyzowanego wyniku JSON. Upewnij się, że Twój prompt wymusza schemat zawierający pola: <b>enriched_fields</b>, <b>conflicts</b>, <b>recommendations</b>.
-                 </p>
-                 <div className="bg-slate-900 rounded-xl p-4 font-mono text-[9px] text-blue-300">
-                    {`{ "enriched_fields": [...], "confidence": 0.8, "source": "..." }`}
+
+              <div className="flex gap-4 items-start">
+                 <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Input Testowy (np. nazwa firmy)</label>
+                    <input 
+                      value={testInput}
+                      onChange={e => setTestInput(e.target.value)}
+                      placeholder="Wpisz testowe dane wejściowe..."
+                      className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-900 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
                  </div>
+                 <button 
+                   onClick={handleTestRun}
+                   disabled={isGenerating || !testInput}
+                   className="mt-6 px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                 >
+                    {isGenerating ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-play"></i>}
+                    <span>Generuj Odpowiedź</span>
+                 </button>
+              </div>
+
+              <div className="flex-1 bg-slate-900 rounded-2xl p-6 overflow-auto border border-slate-800 shadow-inner relative group">
+                 {testOutput ? (
+                    <pre className="font-mono text-xs text-green-400 whitespace-pre-wrap">{testOutput}</pre>
+                 ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-slate-700 font-black uppercase text-[10px] tracking-widest">
+                       Oczekiwanie na wynik...
+                    </div>
+                 )}
+                 {testOutput && (
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(testOutput)}
+                      className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                       <i className="fas fa-copy"></i>
+                    </button>
+                 )}
               </div>
            </div>
+
         </div>
       </div>
     </div>

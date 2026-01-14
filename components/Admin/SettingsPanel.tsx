@@ -2,16 +2,15 @@
 import React, { useState } from 'react';
 import { useSalesStore } from '../../store.ts';
 import UserManagement from './UserManagement.tsx';
-import EmailSettings from './EmailSettings.tsx';
 import IntegrationSettings from './IntegrationSettings.tsx';
 import SSOTManager from './SSOTManager.tsx';
 import AIEnrichmentEditor from './AIEnrichmentEditor.tsx';
 import GeneralSettings from './GeneralSettings.tsx';
 import SystemConfig from './SystemConfig.tsx';
-import AIIntegrationsPanel from './AIIntegrationsPanel.tsx'; // Nowy komponent
+import EmailSettings from './EmailSettings.tsx';
 
 const SettingsPanel: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'system' | 'users' | 'email' | 'zapier' | 'hubspot' | 'ssot' | 'enrichment' | 'ai_modules'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'system' | 'users' | 'email' | 'zapier' | 'hubspot' | 'ssot' | 'enrichment'>('general');
   const { settings, currentUser } = useSalesStore();
 
   const isAdmin = currentUser?.permissions.includes('ADMIN_SETTINGS');
@@ -19,9 +18,8 @@ const SettingsPanel: React.FC = () => {
   const tabs = [
     { id: 'general', label: 'Ustawienia Główne', icon: 'fa-user-circle' },
     { id: 'system', label: 'Konfiguracja Systemowa', icon: 'fa-sliders', adminOnly: true },
-    { id: 'ai_modules', label: 'Moduły AI & Integracje', icon: 'fa-brain', adminOnly: true }, // Nowa pozycja
     { id: 'users', label: '8.1 Użytkownicy i uprawnienia', icon: 'fa-users' },
-    { id: 'email', label: '8.2 Konfiguracja e-mail', icon: 'fa-envelope' },
+    { id: 'email', label: '8.2 Konfiguracja E-mail', icon: 'fa-envelope' },
     { id: 'zapier', label: '8.3 Konfiguracja Zapier', icon: 'fa-bolt' },
     { id: 'hubspot', label: '8.4 Konfiguracja HubSpot API', icon: 'fa-plug' },
     { id: 'ssot', label: '8.5 Baza danych / SSOT', icon: 'fa-database' },
@@ -66,7 +64,6 @@ const SettingsPanel: React.FC = () => {
       <div className="flex-1 p-10 lg:p-16 overflow-y-auto bg-white">
         {activeSubTab === 'general' && <GeneralSettings />}
         {activeSubTab === 'system' && <SystemConfig />}
-        {activeSubTab === 'ai_modules' && <AIIntegrationsPanel />}
         {activeSubTab === 'users' && <UserManagement />}
         {activeSubTab === 'email' && <EmailSettings />}
         {activeSubTab === 'zapier' && <IntegrationSettings type="zapier" />}

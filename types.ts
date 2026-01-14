@@ -10,7 +10,9 @@ export enum AppTab {
   DICTIONARIES = 'DICTIONARIES',
   SETTINGS = 'SETTINGS',
   LOGS = 'LOGS',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  AI_INTEGRATION = 'AI_INTEGRATION',
+  CHAT = 'CHAT'
 }
 
 export type PermissionCode = 
@@ -31,12 +33,44 @@ export interface AIProviderConfig {
   apiKey: string;
   model: string;
   status: 'IDLE' | 'TESTING' | 'CONNECTED' | 'ERROR';
+  responseLanguage?: string;
+  isActiveInResearch: boolean;
+  isConductor: boolean;
+  sortOrder: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  providerId?: AIProviderId;
+  timestamp: number;
 }
 
 export interface MultiAiChatSession {
   query: string;
   responses: Record<string, { text: string; latency: number; status: 'loading' | 'success' | 'error' }>;
+  history: ChatMessage[]; // Added history for linear chat
+  activeProviderId: AIProviderId; // Currently selected provider for chat
   isStreaming: boolean;
+}
+
+export interface ConnectionNode {
+  company: string;
+  role: string;
+  year?: string;
+  active: boolean;
+}
+
+export interface PersonEntry {
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  source?: string; // Skąd pochodzi informacja (np. LinkedIn, KRS, www)
+  linkedinUrl?: string;
+  bio?: string; // Krótka notatka/podsumowanie o osobie
+  connections?: ConnectionNode[]; // Tablica powiązań kapitałowych/osobowych
 }
 
 export interface LeadProfile {
@@ -59,7 +93,10 @@ export interface LeadProfile {
   phone: string;
   techStack: string;
   socialLinkedin: string;
-  googleSheetLink: string; // Dodano brakujące pole
+  googleSheetLink: string;
+  // New OSINT fields
+  management: PersonEntry[];
+  otherEmployees: PersonEntry[];
   enrichment: {
     gemini?: string;
     openai?: string;
@@ -87,18 +124,37 @@ export interface RejestrReport {
   };
 }
 
+export interface ResearchProviderResult {
+  providerId: AIProviderId;
+  timestamp: number;
+  raw: string;
+  json: Partial<LeadProfile>;
+  friendly: string;
+  sources: any[];
+}
+
 export interface ResearchState {
   searchQuery: string;
   searchStatus: 'IDLE' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  agentStatus?: string; // New field to show which AI is working (e.g., "Perplexity Searching...", "Gemini Analyzing")
   profile: LeadProfile;
   rejestrData: RejestrReport | null;
   summaryResult: string;
+  isOrchestrationEnabled: boolean;
+  selectedManualProvider: AIProviderId;
+  providerResults: Record<string, ResearchProviderResult>;
 }
 
 // --- CONFIGURATION & UI SHARED TYPES ---
 
 export type HostingModel = 'CLOUD' | 'OWN_SERVER';
 export type SubscriptionType = 'MONTHLY' | 'ANNUAL' | 'PERPETUAL';
+
+export interface ExtraArrangement {
+  id: string;
+  text: string;
+  amountGrosz: number;
+}
 
 export interface IntegrationItem {
   id: string;
@@ -166,6 +222,50 @@ export interface AIPrompt {
   lastUpdated?: string;
 }
 
+export interface SMTPConfig {
+  id?: string; // Added ID for multiple identities
+  label?: string; // Label for the identity (e.g. "Zarząd")
+  isDefault?: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password_secret: string;
+  encryption: 'SSL_TLS' | 'STARTTLS' | 'NONE';
+  footerHtml: string;
+}
+
+export interface IntegrationSettingsState {
+  portalId?: string;
+  token_secret?: string;
+  webhookUrl?: string;
+  isConnected: boolean;
+  zapierToken?: string; // Added for user-specific zapier auth
+}
+
+export interface RejestrIoConfig {
+  apiKey: string;
+  baseUrl: string;
+  useBearer: boolean;
+  isConnected: boolean;
+}
+
+export interface SystemConfig {
+  schemaVersion: string;
+  allowManualOverrides: boolean;
+  requireManagerApproval: boolean;
+  globalSearchEnabled: boolean;
+}
+
+export interface GlobalSettings {
+  version: string;
+  lastUpdated: string;
+  smtpIdentities: SMTPConfig[]; // Changed from single smtp object to array
+  hubspot: IntegrationSettingsState;
+  rejestrIo: RejestrIoConfig;
+  zapier: IntegrationSettingsState;
+  systemConfig: SystemConfig;
+}
+
 export interface UserSettings {
   employeesDefault: number;
   hourlyRateDefault: number;
@@ -192,7 +292,10 @@ export interface User {
   permissions: PermissionCode[];
   settings?: UserSettings;
   createdAt: string;
+  lastLoginAt?: string;
   mustChangePassword?: boolean;
+  avatar?: string; // New field for user avatar
+  smtpConfig?: SMTPConfig; // New field for user-specific email config
 }
 
 export interface ROIInputs {
@@ -206,7 +309,7 @@ export interface ROIInputs {
   lostTurnoverPercent: number;
   providerCriteria: 'optimakers_spelnia' | 'analiza' | 'nie_spelnia';
   buyingCommittee: { id: string; name: string; position: string; status: 'green' | 'orange' | 'red' }[];
-  schedule: { id: string; label: string; status: 'done' | 'in_progress' | 'ahead'; date: string }[];
+  schedule: { id: string; label: string; description: string; status: 'done' | 'in_progress' | 'ahead'; date: string }[];
   additionalNotes: string;
 }
 
@@ -233,6 +336,7 @@ export interface ConfigSelection {
   implementationMultiplier: number; 
   implementationNotes: string; 
   implementationExtrasAmount: number; 
+  extraArrangements: ExtraArrangement[];
   supportPackage: string; 
   supportPeriod: 'MONTHLY' | 'ANNUAL'; 
   subscriptionYears: number;

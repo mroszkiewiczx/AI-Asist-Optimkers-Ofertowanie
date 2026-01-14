@@ -1,106 +1,158 @@
 
 import React, { useState } from 'react';
 import { useSalesStore } from '../../store.ts';
-import { GoogleGenAI, Type } from "@google/genai";
+import { aiService } from '../../services/aiService.ts';
+import { AIProviderId, ResearchProviderResult } from '../../types.ts';
 import LeadProfileForm from './LeadProfileForm.tsx';
 import RejestrIoPanel from './RejestrIoPanel.tsx';
 
 const ResearchModule: React.FC = () => {
-  const { research, setResearch, updateProfile, currentUser } = useSalesStore();
+  const { research, setResearch, updateProfile, aiProviders } = useSalesStore();
   const [activeTab, setActiveTab] = useState<'profil' | 'finanse' | 'ai'>('profil');
 
+  // 2. LOGIKA PRZYCISKU "SZUKAJ" (Orkiestracja vs Manual)
   const handleSearch = async () => {
     if (!research.searchQuery) return;
-    setResearch({ searchStatus: 'PROCESSING' });
     
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // 1. Wybór Providera (Orkiestracja vs Manual)
+    let providerToUse: AIProviderId;
+    const conductor = aiProviders.find(p => p.isConductor);
     
-    const prompt = `
-      Jesteś analitykiem biznesowym. Przeprowadź research firmy na podstawie zapytania: "${research.searchQuery}".
-      Zwróć dane w formacie JSON (bez Markdown).
-      Struktura JSON:
-      {
-        "nazwa": "Pełna nazwa firmy",
-        "nip": "NIP",
-        "www": "domena.pl",
-        "branza": "Główna branża",
-        "opis": "Krótki opis działalności",
-        "decydent": "Imię i Nazwisko kluczowej osoby",
-        "stanowisko": "Rola decydenta",
-        "tech": "Używane technologie (ERP, CRM, Produkcja)"
-      }
-    `;
-
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: { 
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              nazwa: { type: Type.STRING },
-              nip: { type: Type.STRING },
-              www: { type: Type.STRING },
-              branza: { type: Type.STRING },
-              opis: { type: Type.STRING },
-              decydent: { type: Type.STRING },
-              stanowisko: { type: Type.STRING },
-              tech: { type: Type.STRING },
-            }
-          }
-        }
-      });
-
-      const data = JSON.parse(response.text || '{}');
-      updateProfile({
-        companyName: data.nazwa,
-        nip: data.nip,
-        domain: data.www,
-        industry: data.branza,
-        description: data.opis,
-        decisionMakerName: data.decydent,
-        decisionMakerRole: data.stanowisko,
-        techStack: data.tech
-      });
-      
-      // Mock Rejestr.io data after AI search
-      setResearch({ 
-        searchStatus: 'COMPLETED',
-        rejestrData: {
-          orgId: '123',
-          basic: { name: data.nazwa, krs: '0000123456', nip: data.nip, regon: '123456789', address: 'ul. Fabryczna 1, Warszawa', website: data.www },
-          representation: [{ name: data.decydent, role: data.stanowisko }],
-          finances: [
-            { year: '2023', revenue: 15000000, profit: 1200000 },
-            { year: '2022', revenue: 12500000, profit: 800000 },
-            { year: '2021', revenue: 10000000, profit: 500000 }
-          ],
-          condition: { rating: 'DOBRA', reasons: ['Stały wzrost przychodów', 'Dodatni wynik finansowy', 'Brak zaległości'] }
-        }
-      });
-
-    } catch (err) {
-      console.error(err);
-      setResearch({ searchStatus: 'ERROR' });
+    if (research.isOrchestrationEnabled && conductor) {
+      providerToUse = conductor.id; // np. 'perplexity' (najlepszy do researchu)
+    } else {
+      providerToUse = research.selectedManualProvider || 'google';
     }
+
+    const providerName = aiProviders.find(p => p.id === providerToUse)?.name || providerToUse;
+
+    // 2. Ustawienie statusu UI na PROCESSING
+    setResearch({ 
+        searchStatus: 'PROCESSING', 
+        agentStatus: `${providerName}: Skanowanie rejestrów i strony www (Mode: Deep JSON)...` 
+    });
+    
+    try {
+      // 3. Pobranie konfiguracji modelu
+      const provConfig = aiProviders.find(p => p.id === providerToUse);
+      
+      // 4. Uruchomienie funkcji z serwisu (runWebResearch)
+      // Wymuszamy tryb 'fast' dla demo, ale w realu można by dać 'deep'
+      const { raw, json, friendly, sources } = await aiService.runWebResearch(
+          research.searchQuery, 
+          providerToUse, 
+          'fast', 
+          provConfig?.model
+      );
+      
+      // 5. Zapisanie wyników i scalenie danych z formularzem (profile)
+      const newResult: ResearchProviderResult = {
+        providerId: providerToUse,
+        timestamp: Date.now(),
+        raw,
+        json,
+        friendly,
+        sources
+      };
+
+      const updatedResults = { ...research.providerResults, [providerToUse]: newResult };
+      
+      // Merge profile data
+      updateProfile(json);
+      
+      setResearch({
+          searchStatus: 'COMPLETED',
+          agentStatus: undefined,
+          providerResults: updatedResults,
+          // Symulacja danych KRS jeśli znaleziono NIP
+          rejestrData: json.nip ? {
+            orgId: '123',
+            basic: { 
+                name: json.companyName || '', 
+                krs: json.krs || '', 
+                nip: json.nip || '', 
+                regon: json.regon || '', 
+                address: json.address || '', 
+                website: json.domain || '' 
+            },
+            representation: (json.management || []).map((z: any) => ({ name: z.name, role: z.role })),
+            finances: [
+                { year: '2023', revenue: 15000000, profit: 1200000 },
+                { year: '2022', revenue: 12500000, profit: 800000 },
+                { year: '2021', revenue: 10000000, profit: 500000 }
+            ],
+            condition: { rating: 'DOBRA', reasons: ['Stały wzrost przychodów', 'Dodatni wynik finansowy'] }
+          } : null
+      });
+
+      // 6. Automatyczne Wzbogacanie (Enrichment) jeśli brakuje kluczowych danych
+      if (!json.nip || !json.decisionMakerName) {
+         handleSpecificEnrichment('google'); // Fallback do Gemini na enrichment
+      }
+
+    } catch (e: any) {
+      console.error(e);
+      setResearch({ searchStatus: 'ERROR', agentStatus: 'Wystąpił błąd analizy AI.' });
+    }
+  };
+
+  // 3. KONFIGURACJA WZBOGACANIA DANYCH
+  const handleSpecificEnrichment = async (providerId: AIProviderId) => {
+      setResearch({ searchStatus: 'PROCESSING', agentStatus: `Enrichment (${providerId}): Uzupełnianie brakujących danych...` });
+      
+      try {
+          const updates = await aiService.runEnrichment(research.profile, providerId);
+          
+          if (Object.keys(updates).length > 0) {
+              updateProfile(updates);
+              setResearch({ searchStatus: 'COMPLETED', agentStatus: undefined });
+          } else {
+              setResearch({ searchStatus: 'COMPLETED', agentStatus: 'Nie znaleziono dodatkowych danych.' });
+          }
+      } catch (e) {
+          setResearch({ searchStatus: 'ERROR', agentStatus: 'Błąd Enrichment' });
+      }
   };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-32">
       {/* Search Header */}
-      <div className="bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
+      <div className="bg-slate-900 p-12 rounded-[3rem] text-white shadow-2xl relative overflow-hidden transition-all">
         <i className="fas fa-search absolute right-[-20px] bottom-[-20px] text-[15rem] opacity-5 -rotate-12"></i>
+        
         <div className="relative z-10 space-y-8">
-           <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                 <i className="fas fa-brain text-xl"></i>
-              </div>
-              <div>
-                <h2 className="text-3xl font-black tracking-tight leading-none">Research Intelligence</h2>
-                <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.4em] mt-1">AI-Powered Sales Discovery</p>
-              </div>
+           <div className="flex justify-between items-start">
+               <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                     <i className="fas fa-brain text-xl"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black tracking-tight leading-none">Research Intelligence</h2>
+                    <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.4em] mt-1">Multi-Agent System: Perplexity & Gemini</p>
+                  </div>
+               </div>
+               
+               {/* Provider Selector */}
+               <div className="flex items-center space-x-4 bg-white/10 p-2 rounded-xl border border-white/10">
+                  <span className="text-[10px] font-black uppercase tracking-widest pl-3">Provider:</span>
+                  <select 
+                    value={research.isOrchestrationEnabled ? 'AUTO' : research.selectedManualProvider}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        if(val === 'AUTO') {
+                            setResearch({ isOrchestrationEnabled: true });
+                        } else {
+                            setResearch({ isOrchestrationEnabled: false, selectedManualProvider: val as any });
+                        }
+                    }}
+                    className="bg-slate-800 text-white text-xs font-black uppercase rounded-lg px-3 py-2 outline-none border border-white/20 cursor-pointer"
+                  >
+                     <option value="AUTO">Auto (Orkiestracja)</option>
+                     {aiProviders.filter(p => p.enabled).map(p => (
+                         <option key={p.id} value={p.id}>{p.name}</option>
+                     ))}
+                  </select>
+               </div>
            </div>
 
            <div className="flex gap-4 max-w-4xl">
@@ -120,6 +172,20 @@ const ResearchModule: React.FC = () => {
                 <span>Uruchom Research</span>
               </button>
            </div>
+
+           {/* Live Agent Status */}
+           {research.searchStatus === 'PROCESSING' && (
+             <div className="flex items-center space-x-3 animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex space-x-1">
+                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce"></span>
+                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce delay-100"></span>
+                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce delay-200"></span>
+                </div>
+                <span className="text-xs font-mono text-green-400 uppercase tracking-widest">
+                   {research.agentStatus || "Inicjowanie agentów..."}
+                </span>
+             </div>
+           )}
         </div>
       </div>
 
@@ -138,7 +204,15 @@ const ResearchModule: React.FC = () => {
           <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm text-center space-y-6">
              <i className="fas fa-magic text-5xl text-blue-500 opacity-20"></i>
              <h3 className="text-xl font-black text-slate-900">AI Deep Insight Analysis</h3>
-             <p className="text-slate-500 max-w-xl mx-auto">Kliknij "Uruchom Research", aby AI dokonało głębokiej analizy strategicznej firmy, jej otoczenia rynkowego i wyzwań produkcyjnych.</p>
+             <p className="text-slate-500 max-w-xl mx-auto">
+                {research.profile.enrichment?.gemini || research.profile.enrichment?.perplexity ? 
+                 "Analiza została wykonana. Sprawdź sekcję profilu pod kątem wzbogaconych danych." :
+                 "Kliknij 'Uruchom Research', aby AI dokonało głębokiej analizy strategicznej firmy, jej otoczenia rynkowego i wyzwań produkcyjnych."
+                }
+             </p>
+             <button onClick={() => handleSpecificEnrichment('google')} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase hover:bg-slate-200">
+                Wymuś Deep Enrichment (Gemini)
+             </button>
           </div>
         )}
       </div>

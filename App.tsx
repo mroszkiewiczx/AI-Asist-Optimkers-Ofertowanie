@@ -14,6 +14,8 @@ import UserProfile from './components/Auth/UserProfile.tsx';
 import Dictionaries from './components/Dictionaries.tsx';
 import SettingsPanel from './components/Admin/SettingsPanel.tsx';
 import AuditLogs from './components/Admin/AuditLogs.tsx';
+import AIIntegrationsPanel from './components/Admin/AIIntegrationsPanel.tsx';
+import AIChatModule from './components/Chat/AIChatModule.tsx';
 
 const App: React.FC = () => {
   const { activeTab, setActiveTab, calculateROI, isAuthenticated, currentUser } = useSalesStore();
@@ -44,9 +46,12 @@ const App: React.FC = () => {
               <NavButton active={activeTab === AppTab.CONFIG} onClick={() => setActiveTab(AppTab.CONFIG)} label="Oferta" icon="fa-box-open" />
               <NavButton active={activeTab === AppTab.SCOPE} onClick={() => setActiveTab(AppTab.SCOPE)} label="SOW" icon="fa-shield-halved" />
               <NavButton active={activeTab === AppTab.RESEARCH} onClick={() => setActiveTab(AppTab.RESEARCH)} label="Research" icon="fa-brain" />
+              <NavButton active={activeTab === AppTab.CHAT} onClick={() => setActiveTab(AppTab.CHAT)} label="AI Chat" icon="fa-comments" />
               <NavButton active={activeTab === AppTab.LINE_ITEMS} onClick={() => setActiveTab(AppTab.LINE_ITEMS)} label="Items" icon="fa-list-check" />
               <NavButton active={activeTab === AppTab.SYNC} onClick={() => setActiveTab(AppTab.SYNC)} label="Sync" icon="fa-sync" />
               <NavButton active={activeTab === AppTab.SETTINGS} onClick={() => setActiveTab(AppTab.SETTINGS)} label="Ustawienia" icon="fa-gear" />
+              <NavButton active={activeTab === AppTab.AI_INTEGRATION} onClick={() => setActiveTab(AppTab.AI_INTEGRATION)} label="Modele AI" icon="fa-robot" />
+              <NavButton active={activeTab === AppTab.LOGS} onClick={() => setActiveTab(AppTab.LOGS)} label="Logi" icon="fa-terminal" />
             </nav>
 
             <button onClick={() => setActiveTab(AppTab.PROFILE)} className="flex items-center space-x-3 p-1.5 pl-4 rounded-2xl hover:bg-slate-50 transition-all">
@@ -63,11 +68,13 @@ const App: React.FC = () => {
         {activeTab === AppTab.CONFIG && <LicenseConfigurator />}
         {activeTab === AppTab.SCOPE && <ScopeOfWork />}
         {activeTab === AppTab.RESEARCH && <ResearchModule />}
+        {activeTab === AppTab.CHAT && <AIChatModule />}
         {activeTab === AppTab.LINE_ITEMS && <LineItemsManager />}
         {activeTab === AppTab.SYNC && <HubSpotSync />}
         {activeTab === AppTab.SUMMARY && <SummaryAggregator />}
         {activeTab === AppTab.DICTIONARIES && <Dictionaries />}
         {activeTab === AppTab.SETTINGS && <SettingsPanel />}
+        {activeTab === AppTab.AI_INTEGRATION && <AIIntegrationsPanel />}
         {activeTab === AppTab.PROFILE && <UserProfile />}
         {activeTab === AppTab.LOGS && <AuditLogs />}
       </main>

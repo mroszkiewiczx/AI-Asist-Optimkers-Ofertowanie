@@ -133,6 +133,9 @@ const ROICalculator: React.FC = () => {
                  </div>
                </div>
              ))}
+             {roiInputs.buyingCommittee.length === 0 && (
+               <p className="text-xs text-slate-400 italic text-center py-4">Brak dodanych osób. Kliknij przycisk powyżej, aby dodać członka komitetu.</p>
+             )}
           </div>
         </section>
 
@@ -141,26 +144,30 @@ const ROICalculator: React.FC = () => {
           <SectionHeader icon="fa-calendar-alt" title="1.7 Harmonogram Wdrożenia" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
              {roiInputs.schedule.map(step => (
-               <div key={step.id} className={`flex items-center justify-between p-5 rounded-2xl border-l-4 border-2 transition-all duration-300 ${getStatusColorClass(step.status)}`}>
-                 <span className="text-sm font-black text-black leading-tight pr-4">{step.label}</span>
-                 <div className="flex items-center space-x-3">
-                    <StatusSelect 
-                      value={step.status} 
-                      onChange={v => updateScheduleStep(step.id, { status: v as any })}
-                      options={dictionaries.scheduleStatuses}
-                      small
-                    />
-                    <div className="relative group">
-                      <input 
-                        type="date" 
-                        title="Kliknij ikonę kalendarza po prawej, aby otworzyć wybór daty"
-                        className="text-[10px] font-black text-black bg-white/80 border border-slate-300 rounded-lg pl-3 pr-10 py-2 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm min-w-[140px]" 
-                        value={step.date}
-                        onChange={e => updateScheduleStep(step.id, { date: e.target.value })}
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-600 text-xs pointer-events-none group-hover:scale-125 transition-transform duration-200">
-                        <i className="fas fa-calendar-day"></i>
-                      </div>
+               <div key={step.id} className={`flex flex-col p-6 rounded-2xl border-l-4 border-2 transition-all duration-300 ${getStatusColorClass(step.status)}`}>
+                 <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 pr-4">
+                       <span className="text-sm font-black text-black leading-tight block mb-1">{step.label}</span>
+                       <p className="text-[10px] text-slate-500 font-medium leading-relaxed">{step.description}</p>
+                    </div>
+                    <div className="flex flex-col items-end space-y-2">
+                       <StatusSelect 
+                         value={step.status} 
+                         onChange={v => updateScheduleStep(step.id, { status: v as any })}
+                         options={dictionaries.scheduleStatuses}
+                         small
+                       />
+                       <div className="relative group">
+                         <input 
+                           type="date" 
+                           className="text-[10px] font-black text-black bg-white/80 border border-slate-300 rounded-lg pl-3 pr-10 py-2 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm min-w-[140px]" 
+                           value={step.date}
+                           onChange={e => updateScheduleStep(step.id, { date: e.target.value })}
+                         />
+                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-600 text-xs pointer-events-none group-hover:scale-125 transition-transform duration-200">
+                           <i className="fas fa-calendar-day"></i>
+                         </div>
+                       </div>
                     </div>
                  </div>
                </div>
