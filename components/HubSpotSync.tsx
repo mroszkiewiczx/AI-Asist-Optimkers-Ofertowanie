@@ -6,7 +6,7 @@ import { AppTab } from '../types.ts';
 const HubSpotSync: React.FC = () => {
   const { 
     config, roiResults, getHubSpotLineItems, getDealName, 
-    research, setResearch, setActiveTab 
+    research, setResearch, setActiveTab, settings
   } = useSalesStore();
   
   const [isSyncing, setIsSyncing] = useState(false);
@@ -33,6 +33,7 @@ const HubSpotSync: React.FC = () => {
       addLog("ROZPOCZĘCIE PROCEDURY SYNCHRONIZACJI (4 KROKI)");
       if (!clientData.email || !clientData.companyName) {
          addLog("BŁĄD WALIDACJI: Brak danych kontaktowych klienta (E-mail lub Nazwa).");
+         addLog("PRZERWANIE: Uzupełnij brakujące pola w formularzu po lewej stronie.");
          throw new Error("Validation Failed");
       }
       await new Promise(r => setTimeout(r, 600));
@@ -69,7 +70,9 @@ const HubSpotSync: React.FC = () => {
       addLog("SYNCHRONIZACJA ZAKOŃCZONA POWODZENIEM (COMMIT)");
       setIsSuccess(true);
     } catch (err) {
-      addLog("KRYTYCZNY BŁĄD PODCZAS SYNCHRONIZACJI API.");
+      if ((err as Error).message !== "Validation Failed") {
+         addLog("KRYTYCZNY BŁĄD PODCZAS SYNCHRONIZACJI API.");
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -100,9 +103,33 @@ const HubSpotSync: React.FC = () => {
               
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none">Deal Name (Automatyczny)</label>
-                <div className="p-4 bg-slate-900 text-blue-400 font-mono text-xs rounded-xl border border-slate-800 break-all leading-relaxed">
+                <div className="p-4 bg-slate-900 text-blue-400 font-mono text-xs rounded-2xl border border-slate-800 break-all leading-relaxed">
                    {dealName}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none">Nazwa Firmy <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={clientData.companyName}
+                  onChange={e => setClientData({ companyName: e.target.value })}
+                  placeholder="Wpisz nazwę firmy..."
+                  className={`w-full p-4 bg-slate-50 border rounded-2xl font-black text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all ${!clientData.companyName ? 'border-red-300 ring-2 ring-red-100' : 'border-slate-200'}`}
+                />
+                {!clientData.companyName && <p className="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-widest">Wymagane do synchronizacji</p>}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none">Email Klienta <span className="text-red-500">*</span></label>
+                <input 
+                  type="email" 
+                  value={clientData.email}
+                  onChange={e => setClientData({ email: e.target.value })}
+                  placeholder="klient@firma.pl"
+                  className={`w-full p-4 bg-slate-50 border rounded-2xl font-black text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all ${!clientData.email ? 'border-red-300 ring-2 ring-red-100' : 'border-slate-200'}`}
+                />
+                {!clientData.email && <p className="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-widest">Wymagane do synchronizacji</p>}
               </div>
 
               <div>
@@ -112,7 +139,7 @@ const HubSpotSync: React.FC = () => {
                   value={clientData.domain}
                   onChange={e => setClientData({ domain: e.target.value })}
                   placeholder="https://..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
 
@@ -123,7 +150,7 @@ const HubSpotSync: React.FC = () => {
                  </div>
                  <div className="flex justify-between items-center text-xs font-bold">
                     <span className="text-slate-400">Portal ID</span>
-                    <span className="text-blue-600">1234567</span>
+                    <span className="text-blue-600">{settings.hubspot.portalId || '1234567'}</span>
                  </div>
               </div>
            </section>
@@ -134,7 +161,12 @@ const HubSpotSync: React.FC = () => {
                <div>
                  <h4 className="font-bold text-green-900 mb-1 leading-none">Przesłano pomyślnie</h4>
                  <p className="text-[11px] text-green-700 leading-normal">ID Deal w HubSpot: HS-884219. Dane ROI zostały poprawnie zamapowane na właściwości transakcji.</p>
-                 <button className="mt-4 text-[10px] font-black text-green-800 uppercase tracking-widest hover:underline">Otwórz w HubSpot &rarr;</button>
+                 <button 
+                    onClick={() => window.open(`https://app.hubspot.com/contacts/${settings.hubspot.portalId || '1234567'}/deal/884219`, '_blank')}
+                    className="mt-4 text-[10px] font-black text-green-800 uppercase tracking-widest hover:underline flex items-center"
+                 >
+                    Otwórz w HubSpot <i className="fas fa-arrow-right ml-2"></i>
+                 </button>
                </div>
              </div>
            )}
@@ -180,7 +212,7 @@ const HubSpotSync: React.FC = () => {
             <div className="bg-slate-900 rounded-[2rem] p-8 font-mono text-[10px] text-slate-300 space-y-2 max-h-64 overflow-y-auto shadow-inner border border-slate-800">
               {logs.map((log, i) => (
                 <div key={i} className="flex space-x-3">
-                  <span className={`${log.includes('BŁĄD') ? 'text-red-500' : 'text-green-500'} opacity-50`}>#</span>
+                  <span className={`${log.includes('BŁĄD') || log.includes('PRZERWANIE') ? 'text-red-500' : 'text-green-500'} opacity-50`}>#</span>
                   <span>{log}</span>
                 </div>
               ))}

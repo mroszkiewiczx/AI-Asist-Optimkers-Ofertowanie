@@ -155,16 +155,16 @@ const LicenseConfigurator: React.FC = () => {
           </div>
           
           {/* Hidden Multiplier Gear */}
-          <div className="relative">
-             <button onClick={() => setShowLicMultiplier(!showLicMultiplier)} className="opacity-10 hover:opacity-100 transition-opacity p-2 text-white">
+          <div className="relative group">
+             <button onClick={() => setShowLicMultiplier(!showLicMultiplier)} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-white/50 hover:text-white">
                 <i className="fas fa-cog"></i>
              </button>
              {showLicMultiplier && (
                 <div className="absolute right-0 top-full mt-2 bg-white p-4 rounded-xl shadow-xl z-50 w-64 border border-slate-200 animate-in fade-in slide-in-from-top-2">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mnożnik Ceny (Licencje)</p>
+                   <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Mnożnik Cen (0.8 - 2.5)</p>
                    <div className="flex items-center gap-4">
                       <input 
-                        type="range" min="0.5" max="2.5" step="0.05"
+                        type="range" min="0.8" max="2.5" step="0.05"
                         value={config.licenseMultiplier}
                         onChange={e => setConfig({ licenseMultiplier: Number(e.target.value) })}
                         className="flex-1 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
@@ -403,16 +403,16 @@ const LicenseConfigurator: React.FC = () => {
           </div>
 
           {/* Hidden Implementation Multiplier Gear */}
-          <div className="relative">
-             <button onClick={() => setShowImplMultiplier(!showImplMultiplier)} className="opacity-10 hover:opacity-100 transition-opacity p-2 text-white">
+          <div className="relative group">
+             <button onClick={() => setShowImplMultiplier(!showImplMultiplier)} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-white/50 hover:text-white">
                 <i className="fas fa-cog"></i>
              </button>
              {showImplMultiplier && (
                 <div className="absolute right-0 top-full mt-2 bg-white p-4 rounded-xl shadow-xl z-50 w-64 border border-slate-200 animate-in fade-in slide-in-from-top-2 text-slate-900">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mnożnik Ceny (Wdrożenie)</p>
+                   <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-2">Mnożnik Wdrożenia (0.8 - 2.5)</p>
                    <div className="flex items-center gap-4">
                       <input 
-                        type="range" min="0.5" max="2.5" step="0.05"
+                        type="range" min="0.8" max="2.5" step="0.05"
                         value={config.implementationMultiplier || 1.0}
                         onChange={e => setConfig({ implementationMultiplier: Number(e.target.value) })}
                         className="flex-1 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
